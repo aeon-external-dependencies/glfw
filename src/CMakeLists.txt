@@ -65,6 +65,10 @@ set_target_properties(glfw PROPERTIES
                       POSITION_INDEPENDENT_CODE ON
                       FOLDER "GLFW3")
 
+target_include_directories(glfw
+    PUBLIC ${GLFW_SOURCE_DIR}/include
+)
+
 if (BUILD_SHARED_LIBS)
     if (WIN32)
         # The GLFW DLL needs a special compile-time macro and import library name
@@ -85,10 +89,10 @@ if (BUILD_SHARED_LIBS)
         set_target_properties(glfw PROPERTIES
                               COMPILE_FLAGS "${glfw_CFLAGS} -fno-common"
                               INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}")
-    endif()
-
-    target_link_libraries(glfw ${glfw_LIBRARIES})
+    endif() 
 endif()
+
+target_link_libraries(glfw ${glfw_LIBRARIES})
 
 if (GLFW_INSTALL)
     install(TARGETS glfw EXPORT glfwTargets DESTINATION lib${LIB_SUFFIX})
