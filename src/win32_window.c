@@ -35,8 +35,6 @@
 
 #define _GLFW_KEY_INVALID -2
 
-#define _GLFW_WNDCLASSNAME L"GLFW30"
-
 // Returns the window style for the specified window
 //
 static DWORD getWindowStyle(const _GLFWwindow* window)
@@ -255,16 +253,34 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
                                    WPARAM wParam, LPARAM lParam)
 {
     _GLFWwindow* window = (_GLFWwindow*) GetWindowLongPtrW(hWnd, 0);
+    if (!window)
+    {
+        switch (uMsg)
+        {
+            case WM_NCCREATE:
+            {
+                CREATESTRUCTW* cs = (CREATESTRUCTW*) lParam;
+                SetWindowLongPtrW(hWnd, 0, (LONG_PTR) cs->lpCreateParams);
+                break;
+            }
+
+            case WM_DEVICECHANGE:
+            {
+                if (wParam == DBT_DEVNODES_CHANGED)
+                {
+                    _glfwInputMonitorChange();
+                    return TRUE;
+                }
+
+                break;
+            }
+        }
+
+        return DefWindowProcW(hWnd, uMsg, wParam, lParam);
+    }
 
     switch (uMsg)
     {
-        case WM_NCCREATE:
-        {
-            CREATESTRUCTW* cs = (CREATESTRUCTW*) lParam;
-            SetWindowLongPtrW(hWnd, 0, (LONG_PTR) cs->lpCreateParams);
-            break;
-        }
-
         case WM_SETFOCUS:
         {
             if (window->cursorMode == GLFW_CURSOR_DISABLED)
@@ -529,9 +545,6 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
             int xoff, yoff;
             MINMAXINFO* mmi = (MINMAXINFO*) lParam;
 
-            if (!window)
-                break;
-
             getFullWindowSize(getWindowStyle(window), getWindowExStyle(window),
                               0, 0, &xoff, &yoff);
 
@@ -593,16 +606,6 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
                          rect->right - rect->left,
                          rect->bottom - rect->top,
                          SWP_NOACTIVATE | SWP_NOZORDER);
-            break;
-        }
-
-        case WM_DEVICECHANGE:
-        {
-            if (DBT_DEVNODES_CHANGED == wParam)
-            {
-                _glfwInputMonitorChange();
-                return TRUE;
-            }
             break;
         }
 
@@ -750,16 +753,15 @@ static void destroyWindow(_GLFWwindow* window)
 //
 GLFWbool _glfwRegisterWindowClass(void)
 {
-    WNDCLASSW wc;
+    WNDCLASSEXW wc;
 
+    ZeroMemory(&wc, sizeof(wc));
+    wc.cbSize        = sizeof(wc);
     wc.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wc.lpfnWndProc   = (WNDPROC) windowProc;
-    wc.cbClsExtra    = 0;                           // No extra class data
     wc.cbWndExtra    = sizeof(void*) + sizeof(int); // Make room for one pointer
     wc.hInstance     = GetModuleHandleW(NULL);
     wc.hCursor       = LoadCursorW(NULL, IDC_ARROW);
-    wc.hbrBackground = NULL;                        // No background
-    wc.lpszMenuName  = NULL;                        // No menu
     wc.lpszClassName = _GLFW_WNDCLASSNAME;
 
     // Load user-provided icon if available
@@ -774,7 +776,7 @@ GLFWbool _glfwRegisterWindowClass(void)
                               0, 0, LR_DEFAULTSIZE | LR_SHARED);
     }
 
-    if (!RegisterClassW(&wc))
+    if (!RegisterClassExW(&wc))
     {
         _glfwInputError(GLFW_PLATFORM_ERROR,
                         "Win32: Failed to register window class");
@@ -1339,7 +1341,7 @@ void _glfwPlatformSetClipboardString(_GLFWwindow* window, const char* string)
     memcpy(GlobalLock(stringHandle), wideString, wideSize);
     GlobalUnlock(stringHandle);
 
-    if (!OpenClipboard(window->win32.handle))
+    if (!OpenClipboard(_glfw.win32.helperWindow))
     {
         GlobalFree(stringHandle);
         free(wideString);
@@ -1359,7 +1361,7 @@ const char* _glfwPlatformGetClipboardString(_GLFWwindow* window)
 {
     HANDLE stringHandle;
 
-    if (!OpenClipboard(window->win32.handle))
+    if (!OpenClipboard(_glfw.win32.helperWindow))
     {
         _glfwInputError(GLFW_PLATFORM_ERROR, "Win32: Failed to open clipboard");
         return NULL;

@@ -60,7 +60,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
 
 // Load necessary libraries (DLLs)
 //
-static GLFWbool initLibraries(void)
+static GLFWbool loadLibraries(void)
 {
     _glfw.win32.winmm.instance = LoadLibraryA("winmm.dll");
     if (!_glfw.win32.winmm.instance)
@@ -111,7 +111,7 @@ static GLFWbool initLibraries(void)
 
 // Unload used libraries (DLLs)
 //
-static void terminateLibraries(void)
+static void freeLibraries(void)
 {
     if (_glfw.win32.winmm.instance)
         FreeLibrary(_glfw.win32.winmm.instance);
@@ -263,6 +263,28 @@ static void createKeyTables(void)
     }
 }
 
+// Creates a dummy window for behind-the-scenes work
+//
+static HWND createHelperWindow(void)
+{
+    HWND window = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,
+                                  _GLFW_WNDCLASSNAME,
+                                  L"GLFW helper window",
+                                  WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                                  0, 0, 1, 1,
+                                  NULL, NULL,
+                                  GetModuleHandleW(NULL),
+                                  NULL);
+    if (!window)
+    {
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "Win32: Failed to create helper window");
+        return NULL;
+    }
+
+    return window;
+}
+
 
 //////////////////////////////////////////////////////////////////////////
 //////                       GLFW internal API                      //////
@@ -342,7 +364,7 @@ int _glfwPlatformInit(void)
     SystemParametersInfoW(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, UIntToPtr(0),
                           SPIF_SENDCHANGE);
 
-    if (!initLibraries())
+    if (!loadLibraries())
         return GLFW_FALSE;
 
     createKeyTables();
@@ -354,6 +376,12 @@ int _glfwPlatformInit(void)
 
     if (!_glfwRegisterWindowClass())
         return GLFW_FALSE;
+
+    _glfw.win32.helperWindow = createHelperWindow();
+    if (!_glfw.win32.helperWindow)
+        return GLFW_FALSE;
+
+    _glfwPlatformPollEvents();
 
     if (!_glfwInitContextAPI())
         return GLFW_FALSE;
@@ -377,7 +405,11 @@ void _glfwPlatformTerminate(void)
 
     _glfwTerminateJoysticks();
     _glfwTerminateContextAPI();
-    terminateLibraries();
+
+    if (_glfw.win32.helperWindow)
+        DestroyWindow(_glfw.win32.helperWindow);
+
+    freeLibraries();
 }
 
 const char* _glfwPlatformGetVersionString(void)
