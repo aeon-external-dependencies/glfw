@@ -44,7 +44,7 @@ set(CONSOLE_BINARIES clipboard events msaa gamma glfwinfo
                      iconify joysticks monitors reopen cursor)
 
 set_target_properties(${WINDOWS_BINARIES} ${CONSOLE_BINARIES} PROPERTIES
-                      FOLDER "GLFW3/Tests")
+                      FOLDER "External/GLFW3/Tests")
 
 if (MSVC)
     # Tell MSVC to use main instead of WinMain for Windows subsystem executables

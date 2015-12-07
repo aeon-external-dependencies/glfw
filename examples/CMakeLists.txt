@@ -38,7 +38,7 @@ target_link_libraries(particles "${CMAKE_THREAD_LIBS_INIT}" "${RT_LIBRARY}")
 
 set(WINDOWS_BINARIES boing gears heightmap particles simple splitview wave)
 
-set_target_properties(${WINDOWS_BINARIES} PROPERTIES FOLDER "GLFW3/Examples")
+set_target_properties(${WINDOWS_BINARIES} PROPERTIES FOLDER "External/GLFW3/Examples")
 
 if (MSVC)
     # Tell MSVC to use main instead of WinMain for Windows subsystem executables

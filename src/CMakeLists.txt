@@ -63,7 +63,7 @@ set_target_properties(glfw PROPERTIES
                       VERSION ${GLFW_VERSION}
                       SOVERSION ${GLFW_VERSION_MAJOR}
                       POSITION_INDEPENDENT_CODE ON
-                      FOLDER "GLFW3")
+                      FOLDER "External/GLFW3")
 
 target_include_directories(glfw
     PUBLIC ${GLFW_SOURCE_DIR}/include
