@@ -65,8 +65,16 @@ typedef struct _GLFWwindowWayland
     struct wl_egl_window*       native;
     struct wl_shell_surface*    shell_surface;
     struct wl_callback*         callback;
+
     _GLFWcursor*                currentCursor;
     double                      cursorPosX, cursorPosY;
+
+    // We need to track the monitors the window spans on to calculate the
+    // optimal scaling factor.
+    int                         scale;
+    _GLFWmonitor**              monitors;
+    int                         monitorsCount;
+    int                         monitorsSize;
 } _GLFWwindowWayland;
 
 
@@ -82,6 +90,8 @@ typedef struct _GLFWlibraryWayland
     struct wl_seat*             seat;
     struct wl_pointer*          pointer;
     struct wl_keyboard*         keyboard;
+
+    int                         wl_compositor_version;
 
     struct wl_cursor_theme*     cursorTheme;
     struct wl_surface*          cursorSurface;
@@ -123,7 +133,7 @@ typedef struct _GLFWmonitorWayland
 
     int                         x;
     int                         y;
-
+    int                         scale;
 } _GLFWmonitorWayland;
 
 

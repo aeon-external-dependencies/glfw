@@ -52,6 +52,7 @@ endif()
 
 add_library(glfw ${glfw_SOURCES} ${glfw_HEADERS})
 set_target_properties(glfw PROPERTIES
+                      OUTPUT_NAME ${GLFW_LIB_NAME}
                       VERSION ${GLFW_VERSION}
                       SOVERSION ${GLFW_VERSION_MAJOR}
                       POSITION_INDEPENDENT_CODE ON
@@ -107,13 +108,6 @@ target_link_libraries(glfw ${glfw_LIBRARIES})
 
 if (MSVC)
     target_compile_definitions(glfw PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
-
-if (BUILD_SHARED_LIBS AND UNIX)
-    # On Unix-like systems, shared libraries can use the soname system.
-    set_target_properties(glfw PROPERTIES OUTPUT_NAME glfw)
-else()
-    set_target_properties(glfw PROPERTIES OUTPUT_NAME glfw3)
 endif()
 
 if (GLFW_INSTALL)
