@@ -1,3 +1,7 @@
+if (APPLE)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wdeprecated-declarations")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdeprecated-declarations")
+endif ()
 
 set(common_HEADERS internal.h
                    "${GLFW_BINARY_DIR}/src/glfw_config.h"
