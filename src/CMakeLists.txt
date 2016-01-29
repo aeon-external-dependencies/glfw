@@ -1,6 +1,6 @@
 if (APPLE)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wdeprecated-declarations")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdeprecated-declarations")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 endif ()
 
 set(common_HEADERS internal.h
@@ -82,7 +82,8 @@ target_compile_definitions(glfw PRIVATE
 # Enable a reasonable set of warnings (no, -Wextra is not reasonable)
 target_compile_options(glfw PRIVATE
                        "$<$<C_COMPILER_ID:Clang>:-Wall>"
-                       "$<$<C_COMPILER_ID:GNU>:-Wall>")
+                       "$<$<C_COMPILER_ID:GNU>:-Wall>"
+                       )
 
 if (BUILD_SHARED_LIBS)
     if (WIN32)
