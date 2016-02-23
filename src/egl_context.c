@@ -68,9 +68,9 @@ static const char* getErrorString(EGLint error)
             return "A NativeWindowType argument does not refer to a valid native window";
         case EGL_CONTEXT_LOST:
             return "The application must destroy all contexts and reinitialise";
+        default:
+            return "ERROR: UNKNOWN EGL ERROR";
     }
-
-    return "UNKNOWN EGL ERROR";
 }
 
 // Returns the specified attribute of the specified EGLConfig
@@ -259,6 +259,8 @@ GLFWbool _glfwInitEGL(void)
         _glfwPlatformExtensionSupported("EGL_KHR_create_context");
     _glfw.egl.KHR_create_context_no_error =
         _glfwPlatformExtensionSupported("EGL_KHR_create_context_no_error");
+    _glfw.egl.KHR_gl_colorspace =
+        _glfwPlatformExtensionSupported("EGL_KHR_gl_colorspace");
 
     return GLFW_TRUE;
 }
@@ -288,7 +290,7 @@ GLFWbool _glfwCreateContextEGL(_GLFWwindow* window,
                                const _GLFWctxconfig* ctxconfig,
                                const _GLFWfbconfig* fbconfig)
 {
-    int attribs[40];
+    EGLint attribs[40];
     EGLConfig config;
     EGLContext share = NULL;
 
@@ -401,11 +403,26 @@ GLFWbool _glfwCreateContextEGL(_GLFWwindow* window,
         return GLFW_FALSE;
     }
 
+    // Set up attributes for surface creation
+    {
+        int index = 0;
+
+        if (fbconfig->sRGB)
+        {
+            if (_glfw.egl.KHR_gl_colorspace)
+            {
+                setEGLattrib(EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_SRGB_KHR);
+            }
+        }
+
+        setEGLattrib(EGL_NONE, EGL_NONE);
+    }
+
     window->context.egl.surface =
         eglCreateWindowSurface(_glfw.egl.display,
                                config,
                                _GLFW_EGL_NATIVE_WINDOW,
-                               NULL);
+                               attribs);
     if (window->context.egl.surface == EGL_NO_SURFACE)
     {
         _glfwInputError(GLFW_PLATFORM_ERROR,
@@ -566,17 +583,29 @@ void _glfwPlatformMakeContextCurrent(_GLFWwindow* window)
 {
     if (window)
     {
-        eglMakeCurrent(_glfw.egl.display,
-                       window->context.egl.surface,
-                       window->context.egl.surface,
-                       window->context.egl.handle);
+        if (!eglMakeCurrent(_glfw.egl.display,
+                            window->context.egl.surface,
+                            window->context.egl.surface,
+                            window->context.egl.handle))
+        {
+            _glfwInputError(GLFW_PLATFORM_ERROR,
+                            "EGL: Failed to make context current: %s",
+                            getErrorString(eglGetError()));
+            return;
+        }
     }
     else
     {
-        eglMakeCurrent(_glfw.egl.display,
-                       EGL_NO_SURFACE,
-                       EGL_NO_SURFACE,
-                       EGL_NO_CONTEXT);
+        if (!eglMakeCurrent(_glfw.egl.display,
+                            EGL_NO_SURFACE,
+                            EGL_NO_SURFACE,
+                            EGL_NO_CONTEXT))
+        {
+            _glfwInputError(GLFW_PLATFORM_ERROR,
+                            "EGL: Failed to clear current context: %s",
+                            getErrorString(eglGetError()));
+            return;
+        }
     }
 
     _glfwPlatformSetCurrentContext(window);
@@ -584,6 +613,13 @@ void _glfwPlatformMakeContextCurrent(_GLFWwindow* window)
 
 void _glfwPlatformSwapBuffers(_GLFWwindow* window)
 {
+    if (window != _glfwPlatformGetCurrentContext())
+    {
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "EGL: The context must be current on the calling thread when swapping buffers");
+        return;
+    }
+
     eglSwapBuffers(_glfw.egl.display, window->context.egl.surface);
 }
 

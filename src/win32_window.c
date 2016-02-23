@@ -255,6 +255,8 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
     _GLFWwindow* window = (_GLFWwindow*) GetWindowLongPtrW(hWnd, 0);
     if (!window)
     {
+        // This is the message handling for the hidden helper window
+
         switch (uMsg)
         {
             case WM_NCCREATE:
@@ -264,15 +266,10 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
                 break;
             }
 
-            case WM_DEVICECHANGE:
+            case WM_DISPLAYCHANGE:
             {
-                if (wParam == DBT_DEVNODES_CHANGED)
-                {
-                    _glfwInputMonitorChange();
-                    return TRUE;
-                }
-
-                break;
+                _glfwInputMonitorChange();
+                return 0;
             }
         }
 
@@ -653,6 +650,8 @@ static int createWindow(_GLFWwindow* window, const _GLFWwndconfig* wndconfig)
 {
     int xpos, ypos, fullWidth, fullHeight;
     WCHAR* wideTitle;
+    DWORD style = getWindowStyle(window);
+    DWORD exStyle = getWindowExStyle(window);
 
     if (wndconfig->monitor)
     {
@@ -671,7 +670,10 @@ static int createWindow(_GLFWwindow* window, const _GLFWwndconfig* wndconfig)
         xpos = CW_USEDEFAULT;
         ypos = CW_USEDEFAULT;
 
-        getFullWindowSize(getWindowStyle(window), getWindowExStyle(window),
+        if (wndconfig->maximized)
+            style |= WS_MAXIMIZE;
+
+        getFullWindowSize(style, exStyle,
                           wndconfig->width, wndconfig->height,
                           &fullWidth, &fullHeight);
     }
@@ -684,10 +686,10 @@ static int createWindow(_GLFWwindow* window, const _GLFWwndconfig* wndconfig)
         return GLFW_FALSE;
     }
 
-    window->win32.handle = CreateWindowExW(getWindowExStyle(window),
+    window->win32.handle = CreateWindowExW(exStyle,
                                            _GLFW_WNDCLASSNAME,
                                            wideTitle,
-                                           getWindowStyle(window),
+                                           style,
                                            xpos, ypos,
                                            fullWidth, fullHeight,
                                            NULL, // No parent window
@@ -1026,6 +1028,11 @@ void _glfwPlatformRestoreWindow(_GLFWwindow* window)
     ShowWindow(window->win32.handle, SW_RESTORE);
 }
 
+void _glfwPlatformMaximizeWindow(_GLFWwindow* window)
+{
+    ShowWindow(window->win32.handle, SW_MAXIMIZE);
+}
+
 void _glfwPlatformShowWindow(_GLFWwindow* window)
 {
     ShowWindow(window->win32.handle, SW_SHOW);
@@ -1057,6 +1064,11 @@ int _glfwPlatformWindowIconified(_GLFWwindow* window)
 int _glfwPlatformWindowVisible(_GLFWwindow* window)
 {
     return IsWindowVisible(window->win32.handle);
+}
+
+int _glfwPlatformWindowMaximized(_GLFWwindow* window)
+{
+    return IsZoomed(window->win32.handle);
 }
 
 void _glfwPlatformPollEvents(void)
@@ -1401,6 +1413,74 @@ const char* _glfwPlatformGetClipboardString(_GLFWwindow* window)
     }
 
     return _glfw.win32.clipboardString;
+}
+
+char** _glfwPlatformGetRequiredInstanceExtensions(unsigned int* count)
+{
+    char** extensions;
+
+    *count = 0;
+
+    if (!_glfw.vk.KHR_win32_surface)
+        return NULL;
+
+    extensions = calloc(2, sizeof(char*));
+    extensions[0] = strdup("VK_KHR_surface");
+    extensions[1] = strdup("VK_KHR_win32_surface");
+
+    *count = 2;
+    return extensions;
+}
+
+int _glfwPlatformGetPhysicalDevicePresentationSupport(VkInstance instance,
+                                                      VkPhysicalDevice device,
+                                                      unsigned int queuefamily)
+{
+    PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR vkGetPhysicalDeviceWin32PresentationSupportKHR =
+        (PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR)
+        vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceWin32PresentationSupportKHR");
+    if (!vkGetPhysicalDeviceWin32PresentationSupportKHR)
+    {
+        _glfwInputError(GLFW_API_UNAVAILABLE,
+                        "Win32: Vulkan instance missing VK_KHR_win32_surface extension");
+        return GLFW_FALSE;
+    }
+
+    return vkGetPhysicalDeviceWin32PresentationSupportKHR(device, queuefamily);
+}
+
+VkResult _glfwPlatformCreateWindowSurface(VkInstance instance,
+                                          _GLFWwindow* window,
+                                          const VkAllocationCallbacks* allocator,
+                                          VkSurfaceKHR* surface)
+{
+    VkResult err;
+    VkWin32SurfaceCreateInfoKHR sci;
+    PFN_vkCreateWin32SurfaceKHR vkCreateWin32SurfaceKHR;
+
+    vkCreateWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)
+        vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
+    if (!vkCreateWin32SurfaceKHR)
+    {
+        _glfwInputError(GLFW_API_UNAVAILABLE,
+                        "Win32: Vulkan instance missing VK_KHR_win32_surface extension");
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+
+    memset(&sci, 0, sizeof(sci));
+    sci.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    sci.hinstance = GetModuleHandle(NULL);
+    sci.hwnd = window->win32.handle;
+
+    err = vkCreateWin32SurfaceKHR(instance, &sci, allocator, surface);
+    if (err)
+    {
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "Win32: Failed to create Vulkan surface: %s",
+                        _glfwGetVulkanResultString(err));
+    }
+
+    return err;
 }
 
 

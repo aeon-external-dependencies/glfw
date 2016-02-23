@@ -80,8 +80,7 @@ static void checkScaleChange(_GLFWwindow* window)
     int monitorScale;
 
     // Check if we will be able to set the buffer scale or not.
-    if (_glfw.wl.wl_compositor_version <
-        WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
+    if (_glfw.wl.wl_compositor_version < 3)
         return;
 
     // Get the scale factor from the highest scale monitor.
@@ -460,6 +459,12 @@ void _glfwPlatformRestoreWindow(_GLFWwindow* window)
     fprintf(stderr, "_glfwPlatformRestoreWindow not implemented yet\n");
 }
 
+void _glfwPlatformMaximizeWindow(_GLFWwindow* window)
+{
+    // TODO
+    fprintf(stderr, "_glfwPlatformMaximizeWindow not implemented yet\n");
+}
+
 void _glfwPlatformShowWindow(_GLFWwindow* window)
 {
     wl_shell_surface_set_toplevel(window->wl.shell_surface);
@@ -495,6 +500,12 @@ int _glfwPlatformWindowVisible(_GLFWwindow* window)
     return GLFW_FALSE;
 }
 
+int _glfwPlatformWindowMaximized(_GLFWwindow* window)
+{
+    // TODO
+    return GLFW_FALSE;
+}
+
 void _glfwPlatformPollEvents(void)
 {
     handleEvents(0);
@@ -518,11 +529,17 @@ void _glfwPlatformGetCursorPos(_GLFWwindow* window, double* xpos, double* ypos)
         *ypos = window->wl.cursorPosY;
 }
 
+static GLFWbool isPointerLocked(_GLFWwindow* window);
+
 void _glfwPlatformSetCursorPos(_GLFWwindow* window, double x, double y)
 {
-    // A Wayland client can not set the cursor position
-    _glfwInputError(GLFW_PLATFORM_ERROR,
-                    "Wayland: Cursor position setting not supported");
+    if (isPointerLocked(window))
+    {
+        zwp_locked_pointer_v1_set_cursor_position_hint(
+            window->wl.pointerLock.lockedPointer,
+            wl_fixed_from_double(x), wl_fixed_from_double(y));
+        wl_surface_commit(window->wl.surface);
+    }
 }
 
 void _glfwPlatformSetCursorMode(_GLFWwindow* window, int mode)
@@ -571,10 +588,12 @@ int _glfwPlatformCreateCursor(_GLFWcursor* cursor,
     unsigned char* target = data;
     for (i = 0;  i < image->width * image->height;  i++, source += 4)
     {
-        *target++ = source[2];
-        *target++ = source[1];
-        *target++ = source[0];
-        *target++ = source[3];
+        unsigned int alpha = source[3];
+
+        *target++ = (unsigned char) ((source[2] * alpha) / 255);
+        *target++ = (unsigned char) ((source[1] * alpha) / 255);
+        *target++ = (unsigned char) ((source[0] * alpha) / 255);
+        *target++ = (unsigned char) alpha;
     }
 
     cursor->wl.buffer =
@@ -620,6 +639,103 @@ void _glfwPlatformDestroyCursor(_GLFWcursor* cursor)
         wl_buffer_destroy(cursor->wl.buffer);
 }
 
+static void handleRelativeMotion(void* data,
+                                 struct zwp_relative_pointer_v1* pointer,
+                                 uint32_t timeHi,
+                                 uint32_t timeLo,
+                                 wl_fixed_t dx,
+                                 wl_fixed_t dy,
+                                 wl_fixed_t dxUnaccel,
+                                 wl_fixed_t dyUnaccel)
+{
+    _GLFWwindow* window = data;
+
+    if (window->cursorMode != GLFW_CURSOR_DISABLED)
+        return;
+
+    _glfwInputCursorMotion(window,
+                           wl_fixed_to_double(dxUnaccel),
+                           wl_fixed_to_double(dyUnaccel));
+}
+
+static const struct zwp_relative_pointer_v1_listener relativePointerListener = {
+    handleRelativeMotion
+};
+
+static void handleLocked(void* data,
+                         struct zwp_locked_pointer_v1* lockedPointer)
+{
+}
+
+static void unlockPointer(_GLFWwindow* window)
+{
+    struct zwp_relative_pointer_v1* relativePointer =
+        window->wl.pointerLock.relativePointer;
+    struct zwp_locked_pointer_v1* lockedPointer =
+        window->wl.pointerLock.lockedPointer;
+
+    zwp_relative_pointer_v1_destroy(relativePointer);
+    zwp_locked_pointer_v1_destroy(lockedPointer);
+
+    window->wl.pointerLock.relativePointer = NULL;
+    window->wl.pointerLock.lockedPointer = NULL;
+}
+
+static void lockPointer(_GLFWwindow* window);
+
+static void handleUnlocked(void* data,
+                           struct zwp_locked_pointer_v1* lockedPointer)
+{
+}
+
+static const struct zwp_locked_pointer_v1_listener lockedPointerListener = {
+    handleLocked,
+    handleUnlocked
+};
+
+static void lockPointer(_GLFWwindow* window)
+{
+    struct zwp_relative_pointer_v1* relativePointer;
+    struct zwp_locked_pointer_v1* lockedPointer;
+
+    if (!_glfw.wl.relativePointerManager)
+    {
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "Wayland: no relative pointer manager");
+        return;
+    }
+
+    relativePointer =
+        zwp_relative_pointer_manager_v1_get_relative_pointer(
+            _glfw.wl.relativePointerManager,
+            _glfw.wl.pointer);
+    zwp_relative_pointer_v1_add_listener(relativePointer,
+                                         &relativePointerListener,
+                                         window);
+
+    lockedPointer =
+        zwp_pointer_constraints_v1_lock_pointer(
+            _glfw.wl.pointerConstraints,
+            window->wl.surface,
+            _glfw.wl.pointer,
+            NULL,
+            ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+    zwp_locked_pointer_v1_add_listener(lockedPointer,
+                                       &lockedPointerListener,
+                                       window);
+
+    window->wl.pointerLock.relativePointer = relativePointer;
+    window->wl.pointerLock.lockedPointer = lockedPointer;
+
+    wl_pointer_set_cursor(_glfw.wl.pointer, _glfw.wl.pointerSerial,
+                          NULL, 0, 0);
+}
+
+static GLFWbool isPointerLocked(_GLFWwindow* window)
+{
+    return window->wl.pointerLock.lockedPointer != NULL;
+}
+
 void _glfwPlatformSetCursor(_GLFWwindow* window, _GLFWcursor* cursor)
 {
     struct wl_buffer* buffer;
@@ -636,6 +752,10 @@ void _glfwPlatformSetCursor(_GLFWwindow* window, _GLFWcursor* cursor)
     // the next time the pointer enters the window the cursor will change
     if (window != _glfw.wl.pointerFocus)
         return;
+
+    // Unlock possible pointer lock if no longer disabled.
+    if (window->cursorMode != GLFW_CURSOR_DISABLED && isPointerLocked(window))
+        unlockPointer(window);
 
     if (window->cursorMode == GLFW_CURSOR_NORMAL)
     {
@@ -680,9 +800,15 @@ void _glfwPlatformSetCursor(_GLFWwindow* window, _GLFWcursor* cursor)
             wl_surface_commit(surface);
         }
     }
-    else /* Cursor is hidden set cursor surface to NULL */
+    else if (window->cursorMode == GLFW_CURSOR_DISABLED)
     {
-        wl_pointer_set_cursor(_glfw.wl.pointer, _glfw.wl.pointerSerial, NULL, 0, 0);
+        if (!isPointerLocked(window))
+            lockPointer(window);
+    }
+    else if (window->cursorMode == GLFW_CURSOR_HIDDEN)
+    {
+        wl_pointer_set_cursor(_glfw.wl.pointer, _glfw.wl.pointerSerial,
+                              NULL, 0, 0);
     }
 }
 
@@ -697,6 +823,76 @@ const char* _glfwPlatformGetClipboardString(_GLFWwindow* window)
     // TODO
     fprintf(stderr, "_glfwPlatformGetClipboardString not implemented yet\n");
     return NULL;
+}
+
+char** _glfwPlatformGetRequiredInstanceExtensions(unsigned int* count)
+{
+    char** extensions;
+
+    *count = 0;
+
+    if (!_glfw.vk.KHR_wayland_surface)
+        return NULL;
+
+    extensions = calloc(2, sizeof(char*));
+    extensions[0] = strdup("VK_KHR_surface");
+    extensions[1] = strdup("VK_KHR_wayland_surface");
+
+    *count = 2;
+    return extensions;
+}
+
+int _glfwPlatformGetPhysicalDevicePresentationSupport(VkInstance instance,
+                                                      VkPhysicalDevice device,
+                                                      unsigned int queuefamily)
+{
+    PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR vkGetPhysicalDeviceWaylandPresentationSupportKHR =
+        (PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR)
+        vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceWaylandPresentationSupportKHR");
+    if (!vkGetPhysicalDeviceWaylandPresentationSupportKHR)
+    {
+        _glfwInputError(GLFW_API_UNAVAILABLE,
+                        "Wayland: Vulkan instance missing VK_KHR_wayland_surface extension");
+        return VK_NULL_HANDLE;
+    }
+
+    return vkGetPhysicalDeviceWaylandPresentationSupportKHR(device,
+                                                            queuefamily,
+                                                            _glfw.wl.display);
+}
+
+VkResult _glfwPlatformCreateWindowSurface(VkInstance instance,
+                                          _GLFWwindow* window,
+                                          const VkAllocationCallbacks* allocator,
+                                          VkSurfaceKHR* surface)
+{
+    VkResult err;
+    VkWaylandSurfaceCreateInfoKHR sci;
+    PFN_vkCreateWaylandSurfaceKHR vkCreateWaylandSurfaceKHR;
+
+    vkCreateWaylandSurfaceKHR = (PFN_vkCreateWaylandSurfaceKHR)
+        vkGetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR");
+    if (!vkCreateWaylandSurfaceKHR)
+    {
+        _glfwInputError(GLFW_API_UNAVAILABLE,
+                        "Wayland: Vulkan instance missing VK_KHR_wayland_surface extension");
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+
+    memset(&sci, 0, sizeof(sci));
+    sci.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+    sci.display = _glfw.wl.display;
+    sci.surface = window->wl.surface;
+
+    err = vkCreateWaylandSurfaceKHR(instance, &sci, allocator, surface);
+    if (err)
+    {
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "Wayland: Failed to create Vulkan surface: %s",
+                        _glfwGetVulkanResultString(err));
+    }
+
+    return err;
 }
 
 

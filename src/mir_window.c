@@ -467,6 +467,12 @@ void _glfwPlatformRestoreWindow(_GLFWwindow* window)
     mir_surface_set_state(window->mir.surface, mir_surface_state_restored);
 }
 
+void _glfwPlatformMaximizeWindow(_GLFWwindow* window)
+{
+    _glfwInputError(GLFW_PLATFORM_ERROR,
+                    "Mir: Unsupported function %s", __PRETTY_FUNCTION__);
+}
+
 void _glfwPlatformHideWindow(_GLFWwindow* window)
 {
     MirSurfaceSpec* spec;
@@ -512,6 +518,13 @@ int _glfwPlatformWindowIconified(_GLFWwindow* window)
 int _glfwPlatformWindowVisible(_GLFWwindow* window)
 {
     return mir_surface_get_visibility(window->mir.surface) == mir_surface_visibility_exposed;
+}
+
+int _glfwPlatformWindowMaximized(_GLFWwindow* window)
+{
+    _glfwInputError(GLFW_PLATFORM_ERROR,
+                    "Mir: Unsupported function %s", __PRETTY_FUNCTION__);
+    return GLFW_FALSE;
 }
 
 void _glfwPlatformPollEvents(void)
@@ -704,6 +717,76 @@ const char* _glfwPlatformGetClipboardString(_GLFWwindow* window)
                     "Mir: Unsupported function %s", __PRETTY_FUNCTION__);
 
     return NULL;
+}
+
+char** _glfwPlatformGetRequiredInstanceExtensions(unsigned int* count)
+{
+    char** extensions;
+
+    *count = 0;
+
+    if (!_glfw.vk.KHR_mir_surface)
+        return NULL;
+
+    extensions = calloc(2, sizeof(char*));
+    extensions[0] = strdup("VK_KHR_surface");
+    extensions[1] = strdup("VK_KHR_mir_surface");
+
+    *count = 2;
+    return extensions;
+}
+
+int _glfwPlatformGetPhysicalDevicePresentationSupport(VkInstance instance,
+                                                      VkPhysicalDevice device,
+                                                      unsigned int queuefamily)
+{
+    PFN_vkGetPhysicalDeviceMirPresentationSupportKHR vkGetPhysicalDeviceMirPresentationSupportKHR =
+        (PFN_vkGetPhysicalDeviceMirPresentationSupportKHR)
+        vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceMirPresentationSupportKHR");
+    if (!vkGetPhysicalDeviceMirPresentationSupportKHR)
+    {
+        _glfwInputError(GLFW_API_UNAVAILABLE,
+                        "Mir: Vulkan instance missing VK_KHR_mir_surface extension");
+        return GLFW_FALSE;
+    }
+
+    return vkGetPhysicalDeviceMirPresentationSupportKHR(device,
+                                                        queuefamily,
+                                                        _glfw.mir.connection);
+}
+
+VkResult _glfwPlatformCreateWindowSurface(VkInstance instance,
+                                          _GLFWwindow* window,
+                                          const VkAllocationCallbacks* allocator,
+                                          VkSurfaceKHR* surface)
+{
+    VkResult err;
+    VkMirSurfaceCreateInfoKHR sci;
+    PFN_vkCreateMirSurfaceKHR vkCreateMirSurfaceKHR;
+
+    vkCreateMirSurfaceKHR = (PFN_vkCreateMirSurfaceKHR)
+        vkGetInstanceProcAddr(instance, "vkCreateMirSurfaceKHR");
+    if (!vkCreateMirSurfaceKHR)
+    {
+        _glfwInputError(GLFW_API_UNAVAILABLE,
+                        "Mir: Vulkan instance missing VK_KHR_mir_surface extension");
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+
+    memset(&sci, 0, sizeof(sci));
+    sci.sType = VK_STRUCTURE_TYPE_MIR_SURFACE_CREATE_INFO_KHR;
+    sci.connection = _glfw.mir.connection;
+    sci.mirSurface = window->mir.surface;
+
+    err = vkCreateMirSurfaceKHR(instance, &sci, allocator, surface);
+    if (err)
+    {
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "Mir: Failed to create Vulkan surface: %s",
+                        _glfwGetVulkanResultString(err));
+    }
+
+    return err;
 }
 
 

@@ -1,11 +1,11 @@
 /*!
 
-@page compile Compiling GLFW
+@page compile_guide Compiling GLFW
 
 @tableofcontents
 
 This is about compiling the GLFW library itself.  For information on how to
-build applications that use GLFW, see the @ref build guide.
+build applications that use GLFW, see @ref build_guide.
 
 
 @section compile_cmake Using CMake
@@ -87,10 +87,10 @@ Once you have Xcode installed, move on to @ref compile_generate.
 
 @subsubsection compile_deps_x11 Dependencies for Linux and X11
 
-To compile GLFW for X11, you need to have the X11 and OpenGL header packages
-installed, as well as the basic development tools like GCC and make.  For
-example, on Ubuntu and other distributions based on Debian GNU/Linux, you need
-to install the `xorg-dev` package, which pulls in all X.org header packages.
+To compile GLFW for X11, you need to have the X11 packages installed, as well as
+the basic development tools like GCC and make.  For example, on Ubuntu and other
+distributions based on Debian GNU/Linux, you need to install the `xorg-dev`
+package, which pulls in all X.org header packages.
 
 Once you have installed the necessary packages, move on to @ref
 compile_generate.
@@ -156,7 +156,7 @@ necessary to compile GLFW.  Go ahead and compile the actual GLFW library with
 these files, as you would with any other project.
 
 Once the GLFW library is compiled, you are ready to build your applications,
-linking it to the GLFW library.  See the @ref build guide for more information.
+linking it to the GLFW library.  See @ref build_guide for more information.
 
 
 @subsection compile_options CMake options
@@ -274,8 +274,6 @@ must also define `_GLFW_BUILD_DLL`.  Otherwise, you must not define it.
 If you are using the X11 window creation API, support for the following X11
 extensions can be enabled:
 
- - `_GLFW_HAS_XINPUT` to use XInput2 for high-resolution cursor motion
- (recommended)
  - `_GLFW_HAS_XF86VM` to use Xxf86vm as a fallback when RandR gamma is broken
  (recommended)
 

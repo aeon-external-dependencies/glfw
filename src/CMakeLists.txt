@@ -7,7 +7,7 @@ set(common_HEADERS internal.h
                    "${GLFW_BINARY_DIR}/src/glfw_config.h"
                    "${GLFW_SOURCE_DIR}/include/GLFW/glfw3.h"
                    "${GLFW_SOURCE_DIR}/include/GLFW/glfw3native.h")
-set(common_SOURCES context.c init.c input.c monitor.c window.c)
+set(common_SOURCES context.c init.c input.c monitor.c vulkan.c window.c)
 
 if (_GLFW_COCOA)
     set(glfw_HEADERS ${common_HEADERS} cocoa_platform.h cocoa_joystick.h
@@ -28,6 +28,15 @@ elseif (_GLFW_WAYLAND)
                      posix_time.h posix_tls.h xkb_unicode.h)
     set(glfw_SOURCES ${common_SOURCES} wl_init.c wl_monitor.c wl_window.c
                      linux_joystick.c posix_time.c posix_tls.c xkb_unicode.c)
+
+    ecm_add_wayland_client_protocol(glfw_SOURCES
+        PROTOCOL
+        ${WAYLAND_PROTOCOLS_PKGDATADIR}/unstable/relative-pointer/relative-pointer-unstable-v1.xml
+        BASENAME relative-pointer-unstable-v1)
+    ecm_add_wayland_client_protocol(glfw_SOURCES
+        PROTOCOL
+        ${WAYLAND_PROTOCOLS_PKGDATADIR}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml
+        BASENAME pointer-constraints-unstable-v1)
 elseif (_GLFW_MIR)
     set(glfw_HEADERS ${common_HEADERS} mir_platform.h linux_joystick.h
                      posix_time.h posix_tls.h xkb_unicode.h)
@@ -67,6 +76,9 @@ target_include_directories(glfw
 )
 
 target_compile_definitions(glfw PRIVATE -D_GLFW_USE_CONFIG_H)
+target_include_directories(glfw PUBLIC
+                           $<BUILD_INTERFACE:${GLFW_SOURCE_DIR}/include>
+                           $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include>)
 target_include_directories(glfw PRIVATE
                            "${GLFW_SOURCE_DIR}/src"
                            "${GLFW_BINARY_DIR}/src"
@@ -102,11 +114,13 @@ if (BUILD_SHARED_LIBS)
         target_compile_options(glfw PRIVATE "-fno-common")
 
         set_target_properties(glfw PROPERTIES
-                              INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}")
+                              INSTALL_NAME_DIR "lib${LIB_SUFFIX}")
     elseif (UNIX)
         # Hide symbols not explicitly tagged for export from the shared library
         target_compile_options(glfw PRIVATE "-fvisibility=hidden")
     endif() 
+
+    target_compile_definitions(glfw INTERFACE -DGLFW_DLL)
 endif()
 
 target_link_libraries(glfw ${glfw_LIBRARIES})

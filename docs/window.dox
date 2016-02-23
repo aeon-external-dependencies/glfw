@@ -1,16 +1,17 @@
 /*!
 
-@page window Window guide
+@page window_guide Window guide
  
 @tableofcontents
 
-This guide introduces the window related functions of GLFW.  There are also
-guides for the other areas of GLFW.
+This guide introduces the window related functions of GLFW.  For details on
+a specific function, see the [reference documentation](@ref window).  There are
+also guides for the other areas of GLFW.
 
- - @ref intro
- - @ref context
- - @ref monitor
- - @ref input
+ - @ref intro_guide
+ - @ref context_guide
+ - @ref monitor_guide
+ - @ref input_guide
 
 
 @section window_object Window objects
@@ -174,6 +175,9 @@ above other regular windows, also called topmost or always-on-top.  This is
 intended primarily for debugging purposes and cannot be used to implement proper
 full screen windows.  This hint is ignored for full screen windows.
 
+`GLFW_MAXIMIZED` specifies whether the windowed mode window will be maximized
+when created.  This hint is ignored for full screen windows.
+
 
 @subsubsection window_hints_fb Framebuffer related hints
 
@@ -206,8 +210,9 @@ Zero disables multisampling.  `GLFW_DONT_CARE` means the application has no
 preference.
 
 `GLFW_SRGB_CAPABLE` specifies whether the framebuffer should be sRGB capable.
-If supported, the created context will provide `GL_ARB_framebuffer_sRGB` or
-`GL_EXT_framebuffer_sRGB`.
+If supported, a created OpenGL context will support the `GL_FRAMEBUFFER_SRGB`
+enable, also called `GL_FRAMEBUFFER_SRGB_EXT`) for controlling sRGB rendering
+and a created OpenGL ES context will always have sRGB rendering enabled.
 
 `GLFW_DOUBLEBUFFER` specifies whether the framebuffer should be double buffered.
 You nearly always want to use double buffering.  This is a hard constraint.
@@ -321,6 +326,7 @@ Window hint                     | Default value               | Supported values
 `GLFW_FOCUSED`                  | `GLFW_TRUE`                 | `GLFW_TRUE` or `GLFW_FALSE`
 `GLFW_AUTO_ICONIFY`             | `GLFW_TRUE`                 | `GLFW_TRUE` or `GLFW_FALSE`
 `GLFW_FLOATING`                 | `GLFW_FALSE`                | `GLFW_TRUE` or `GLFW_FALSE`
+`GLFW_MAXIMIZED`                | `GLFW_FALSE`                | `GLFW_TRUE` or `GLFW_FALSE`
 `GLFW_RED_BITS`                 | 8                           | 0 to `INT_MAX` or `GLFW_DONT_CARE`
 `GLFW_GREEN_BITS`               | 8                           | 0 to `INT_MAX` or `GLFW_DONT_CARE`
 `GLFW_BLUE_BITS`                | 8                           | 0 to `INT_MAX` or `GLFW_DONT_CARE`
@@ -788,6 +794,9 @@ same name.
 
 `GLFW_ICONIFIED` indicates whether the specified window is iconified, whether by
 the user or with @ref glfwIconifyWindow.
+
+`GLFW_MAXIMIZED` indicates whether the specified window is maximized, whether by
+the user or with @ref glfwMaximizeWindow.
 
 `GLFW_VISIBLE` indicates whether the specified window is visible.  Window
 visibility can be controlled with @ref glfwShowWindow and @ref glfwHideWindow
