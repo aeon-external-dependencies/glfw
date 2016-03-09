@@ -470,16 +470,16 @@ void _glfwPlatformShowWindow(_GLFWwindow* window)
     wl_shell_surface_set_toplevel(window->wl.shell_surface);
 }
 
-void _glfwPlatformUnhideWindow(_GLFWwindow* window)
-{
-    // TODO
-    fprintf(stderr, "_glfwPlatformUnhideWindow not implemented yet\n");
-}
-
 void _glfwPlatformHideWindow(_GLFWwindow* window)
 {
     wl_surface_attach(window->wl.surface, NULL, 0, 0);
     wl_surface_commit(window->wl.surface);
+}
+
+void _glfwPlatformFocusWindow(_GLFWwindow* window)
+{
+    // TODO
+    fprintf(stderr, "_glfwPlatformFocusWindow not implemented yet\n");
 }
 
 int _glfwPlatformWindowFocused(_GLFWwindow* window)
@@ -514,6 +514,11 @@ void _glfwPlatformPollEvents(void)
 void _glfwPlatformWaitEvents(void)
 {
     handleEvents(-1);
+}
+
+void _glfwPlatformWaitEventsTimeout(double timeout)
+{
+    handleEvents((int) (timeout * 1e3));
 }
 
 void _glfwPlatformPostEmptyEvent(void)

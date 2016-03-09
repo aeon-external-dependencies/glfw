@@ -12,7 +12,7 @@ for creating windows, contexts and surfaces, reading input, handling events, etc
 Version 3.2 is _not yet described_.
 
 If you are new to GLFW, you may find the
-[introductory tutorial](http://www.glfw.org/docs/latest/quick.html) for GLFW
+[tutorial](http://www.glfw.org/docs/latest/quick.html) for GLFW
 3 useful.  If you have used GLFW 2 in the past, there is a
 [transition guide](http://www.glfw.org/docs/latest/moving.html) for moving to
 the GLFW 3 API.
@@ -78,10 +78,14 @@ does not find Doxygen, the documentation will not be generated.
    `glfwGetInstanceProcAddress`, `glfwGetPhysicalDevicePresentationSupport` and
    `glfwCreateWindowSurface` for platform independent Vulkan support
  - Added `glfwMaximizeWindow` and `GLFW_MAXIMIZED` for window maximization
+ - Added `glfwFocusWindow` for giving windows input focus
  - Added `glfwSetWindowSizeLimits` and `glfwSetWindowAspectRatio` for setting
    absolute and relative window size limits
  - Added `glfwGetKeyName` for querying the layout-specific name of printable
    keys
+ - Added `glfwWaitEventsTimeout` for waiting for events for a set amount of time
+ - Added `glfwGetTimerValue` and `glfwGetTimerFrequency` for raw timer access
+ - Added `GLFWuint64` for platform-independent 64-bit unsigned values
  - Added `GLFW_NO_API` for creating window without contexts
  - Added `GLFW_CONTEXT_NO_ERROR` context hint for `GL_KHR_no_error` support
  - Added `GLFW_INCLUDE_VULKAN` for including the Vulkan header
@@ -100,9 +104,12 @@ does not find Doxygen, the documentation will not be generated.
                    when no windows existed
  - [Win32] Bugfix: Activating or deactivating displays in software did not
                    trigger monitor callback
+ - [Win32] Bugfix: No monitors were listed on headless and VMware guest systems
  - [Cocoa] Removed support for OS X 10.6
  - [Cocoa] Bugfix: Full screen windows on secondary monitors were mispositioned
  - [Cocoa] Bugfix: Connecting a joystick that reports no name would segfault
+ - [Cocoa] Bugfix: Modifier flags cache was not updated when window became key
+ - [Cocoa] Bugfix: Dead key character composition did not work
  - [X11] Bugfix: Monitor connection and disconnection events were not reported
  - [X11] Bugfix: Decoding of UTF-8 text from XIM could continue past the end
  - [X11] Bugfix: An XKB structure was leaked during `glfwInit`
@@ -110,7 +117,7 @@ does not find Doxygen, the documentation will not be generated.
  - [POSIX] Bugfix: An unrelated TLS key could be deleted by `glfwTerminate`
  - [WGL] Changed extension loading to only be performed once
  - [WGL] Removed dependency on external WGL headers
- - [GLX] Replaced legacy renderable with `GLXWindow`
+ - [GLX] Replaced legacy drawable with `GLXWindow`
  - [GLX] Removed dependency on external GLX headers
  - [GLX] Bugfix: NetBSD does not provide `libGL.so.1`
  - [EGL] Added `_GLFW_USE_EGLPLATFORM_H` configuration macro for controlling
@@ -163,6 +170,7 @@ skills.
  - Paul R. Deppe
  - Michael Dickens
  - Роман Донченко
+ - Mario Dorn
  - Jonathan Dummer
  - Ralph Eastwood
  - Siavash Eliasi
@@ -226,6 +234,7 @@ skills.
  - SephiRok
  - Steve Sexton
  - Systemcluster
+ - Yoshiki Shibukawa
  - Dmitri Shuralyov
  - Daniel Skorupski
  - Bradley Smith
@@ -245,6 +254,7 @@ skills.
  - Simon Voordouw
  - Torsten Walluhn
  - Patrick Walton
+ - Xo Wang
  - Jay Weisskopf
  - Frank Wille
  - yuriks

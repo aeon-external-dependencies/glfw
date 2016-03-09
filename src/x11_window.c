@@ -318,6 +318,8 @@ static GLFWbool createWindow(_GLFWwindow* window,
                                     window->x11.handle,
                                     CWOverrideRedirect,
                                     &attributes);
+
+            window->x11.overrideRedirect = GLFW_TRUE;
         }
     }
     else
@@ -763,19 +765,7 @@ static void enterFullscreenMode(_GLFWwindow* window)
                       0);
     }
 
-    if (_glfw.x11.NET_ACTIVE_WINDOW)
-    {
-        // Ask the window manager to raise and focus the GLFW window
-        // Only focused windows with the _NET_WM_STATE_FULLSCREEN state end up
-        // on top of all other windows ("Stacking order" in EWMH spec)
-        sendEventToWM(window, _glfw.x11.NET_ACTIVE_WINDOW, 1, 0, 0, 0, 0);
-    }
-    else
-    {
-        XRaiseWindow(_glfw.x11.display, window->x11.handle);
-        XSetInputFocus(_glfw.x11.display, window->x11.handle,
-                       RevertToParent, CurrentTime);
-    }
+    _glfwPlatformFocusWindow(window);
 
     if (_glfw.x11.NET_WM_STATE && _glfw.x11.NET_WM_STATE_FULLSCREEN)
     {
@@ -986,12 +976,13 @@ static void processEvent(XEvent *event)
                         next.xkey.window == event->xkey.window &&
                         next.xkey.keycode == keycode)
                     {
-                        // HACK: Repeat events sometimes leak through due to
-                        //       some sort of time drift, so add an epsilon
-                        //       Toshiyuki Takahashi can press a button 16 times
-                        //       per second so it's fairly safe to assume that
-                        //       no human is pressing the key 50 times per
-                        //       second (value is ms)
+                        // HACK: The time of repeat events sometimes doesn't
+                        //       match that of the press event, so add an
+                        //       epsilon
+                        //       Toshiyuki Takahashi can press a button
+                        //       16 times per second so it's fairly safe to
+                        //       assume that no human is pressing the key 50
+                        //       times per second (value is ms)
                         if ((next.xkey.time - event->xkey.time) < 20)
                         {
                             // This is very likely a server-generated key repeat
@@ -1124,6 +1115,9 @@ static void processEvent(XEvent *event)
 
         case ConfigureNotify:
         {
+            if (!window->x11.overrideRedirect && !event->xany.send_event)
+                return;
+
             if (event->xconfigure.width != window->x11.width ||
                 event->xconfigure.height != window->x11.height)
             {
@@ -1685,13 +1679,16 @@ void _glfwPlatformGetWindowFrameSize(_GLFWwindow* window,
 {
     long* extents = NULL;
 
+    if (window->monitor || !window->decorated)
+        return;
+
     if (_glfw.x11.NET_FRAME_EXTENTS == None)
         return;
 
     if (!_glfwPlatformWindowVisible(window) &&
         _glfw.x11.NET_REQUEST_FRAME_EXTENTS)
     {
-        double base;
+        GLFWuint64 base;
         XEvent event;
 
         // Ensure _NET_FRAME_EXTENTS is set, allowing glfwGetWindowFrameSize to
@@ -1699,13 +1696,14 @@ void _glfwPlatformGetWindowFrameSize(_GLFWwindow* window,
         sendEventToWM(window, _glfw.x11.NET_REQUEST_FRAME_EXTENTS,
                       0, 0, 0, 0, 0);
 
+        base = _glfwPlatformGetTimerValue();
+
         // HACK: Poll with timeout for the required reply instead of blocking
         //       This is done because some window managers (at least Unity,
         //       Fluxbox and Xfwm) failed to send the required reply
         //       They have been fixed but broken versions are still in the wild
         //       If you are affected by this and your window manager is NOT
         //       listed above, PLEASE report it to their and our issue trackers
-        base = _glfwPlatformGetTime();
         while (!XCheckIfEvent(_glfw.x11.display,
                               &event,
                               isFrameExtentsEvent,
@@ -1714,7 +1712,8 @@ void _glfwPlatformGetWindowFrameSize(_GLFWwindow* window,
             double remaining;
             struct timeval timeout;
 
-            remaining = 0.5 + base - _glfwPlatformGetTime();
+            remaining = 0.5 - (_glfwPlatformGetTimerValue() - base) /
+                (double) _glfwPlatformGetTimerFrequency();
             if (remaining <= 0.0)
             {
                 _glfwInputError(GLFW_PLATFORM_ERROR,
@@ -1749,7 +1748,7 @@ void _glfwPlatformGetWindowFrameSize(_GLFWwindow* window,
 
 void _glfwPlatformIconifyWindow(_GLFWwindow* window)
 {
-    if (!_glfw.x11.NET_WM_STATE || !_glfw.x11.NET_WM_STATE_FULLSCREEN)
+    if (window->x11.overrideRedirect)
     {
         // Override-redirect windows cannot be iconified or restored, as those
         // tasks are performed by the window manager
@@ -1764,7 +1763,7 @@ void _glfwPlatformIconifyWindow(_GLFWwindow* window)
 
 void _glfwPlatformRestoreWindow(_GLFWwindow* window)
 {
-    if (!_glfw.x11.NET_WM_STATE || !_glfw.x11.NET_WM_STATE_FULLSCREEN)
+    if (window->x11.overrideRedirect)
     {
         // Override-redirect windows cannot be iconified or restored, as those
         // tasks are performed by the window manager
@@ -1811,12 +1810,6 @@ void _glfwPlatformMaximizeWindow(_GLFWwindow* window)
 
 void _glfwPlatformShowWindow(_GLFWwindow* window)
 {
-    XMapRaised(_glfw.x11.display, window->x11.handle);
-    XFlush(_glfw.x11.display);
-}
-
-void _glfwPlatformUnhideWindow(_GLFWwindow* window)
-{
     XMapWindow(_glfw.x11.display, window->x11.handle);
     XFlush(_glfw.x11.display);
 }
@@ -1824,6 +1817,25 @@ void _glfwPlatformUnhideWindow(_GLFWwindow* window)
 void _glfwPlatformHideWindow(_GLFWwindow* window)
 {
     XUnmapWindow(_glfw.x11.display, window->x11.handle);
+    XFlush(_glfw.x11.display);
+}
+
+void _glfwPlatformFocusWindow(_GLFWwindow* window)
+{
+    if (_glfw.x11.NET_ACTIVE_WINDOW)
+    {
+        // Ask the window manager to raise and focus the GLFW window
+        // Only focused windows with the _NET_WM_STATE_FULLSCREEN state end up
+        // on top of all other windows ("Stacking order" in EWMH spec)
+        sendEventToWM(window, _glfw.x11.NET_ACTIVE_WINDOW, 1, 0, 0, 0, 0);
+    }
+    else
+    {
+        XRaiseWindow(_glfw.x11.display, window->x11.handle);
+        XSetInputFocus(_glfw.x11.display, window->x11.handle,
+                       RevertToParent, CurrentTime);
+    }
+
     XFlush(_glfw.x11.display);
 }
 
@@ -1896,6 +1908,28 @@ void _glfwPlatformWaitEvents(void)
 {
     while (!XPending(_glfw.x11.display))
         selectDisplayConnection(NULL);
+
+    _glfwPlatformPollEvents();
+}
+
+void _glfwPlatformWaitEventsTimeout(double timeout)
+{
+    const double deadline = timeout + _glfwPlatformGetTimerValue() /
+        (double) _glfwPlatformGetTimerFrequency();
+
+    while (!XPending(_glfw.x11.display))
+    {
+        const double remaining = deadline - _glfwPlatformGetTimerValue() /
+            (double) _glfwPlatformGetTimerFrequency();
+        if (remaining <= 0.0)
+            return;
+
+        const long seconds = (long) remaining;
+        const long microseconds = (long) ((remaining - seconds) * 1e6);
+        struct timeval tv = { seconds, microseconds };
+
+        selectDisplayConnection(&tv);
+    }
 
     _glfwPlatformPollEvents();
 }

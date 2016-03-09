@@ -117,10 +117,9 @@ extern "C" {
 
 /* Most Windows GLU headers need wchar_t.
  * The OS X OpenGL header blocks the definition of ptrdiff_t by glext.h.
+ * Include it unconditionally to avoid surprising side-effects.
  */
-#if !defined(GLFW_INCLUDE_NONE)
- #include <stddef.h>
-#endif
+#include <stddef.h>
 
 /* Include the chosen client API headers.
  */
@@ -728,6 +727,19 @@ extern "C" {
 /*************************************************************************
  * GLFW API types
  *************************************************************************/
+
+/*! @brief 64-bit unsigned integer.
+ *
+ *  64-bit unsigned integer.
+ *
+ *  @since Added in version 3.2.
+ */
+#if defined(_MSC_VER) && (_MSC_VER < 1600)
+typedef unsigned __int64 GLFWuint64;
+#else
+ #include <stdint.h>
+typedef uint64_t GLFWuint64;
+#endif
 
 /*! @brief Client API function pointer type.
  *
@@ -2283,6 +2295,34 @@ GLFWAPI void glfwShowWindow(GLFWwindow* window);
  */
 GLFWAPI void glfwHideWindow(GLFWwindow* window);
 
+/*! @brief Brings the specified window to front and sets input focus.
+ *
+ *  This function brings the specified window to front and sets input focus.
+ *  The window should already be visible and not iconified.
+ *
+ *  By default, both windowed and full screen mode windows are focused when
+ *  initially created.  Set the [GLFW_FOCUSED](@ref window_hints_wnd) to disable
+ *  this behavior.
+ *
+ *  __Do not use this function__ to steal focus from other applications unless
+ *  you are certain that is what the user wants.  Focus stealing can be
+ *  extremely disruptive.
+ *
+ *  @param[in] window The window to give input focus.
+ *
+ *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED and @ref
+ *  GLFW_PLATFORM_ERROR.
+ *
+ *  @thread_safety This function must only be called from the main thread.
+ *
+ *  @sa @ref window_focus
+ *
+ *  @since Added in version 3.2.
+ *
+ *  @ingroup window
+ */
+GLFWAPI void glfwFocusWindow(GLFWwindow* window);
+
 /*! @brief Returns the monitor that the window uses for full screen mode.
  *
  *  This function returns the handle of the monitor that the specified window is
@@ -2593,6 +2633,7 @@ GLFWAPI GLFWframebuffersizefun glfwSetFramebufferSizeCallback(GLFWwindow* window
  *
  *  @sa @ref events
  *  @sa glfwWaitEvents
+ *  @sa glfwWaitEventsTimeout
  *
  *  @since Added in version 1.0.
  *
@@ -2637,12 +2678,59 @@ GLFWAPI void glfwPollEvents(void);
  *
  *  @sa @ref events
  *  @sa glfwPollEvents
+ *  @sa glfwWaitEventsTimeout
  *
  *  @since Added in version 2.5.
  *
  *  @ingroup window
  */
 GLFWAPI void glfwWaitEvents(void);
+
+/*! @brief Waits with timeout until events are queued and processes them.
+ *
+ *  This function puts the calling thread to sleep until at least one event is
+ *  available in the event queue, or until the specified timeout is reached.  If
+ *  one or more events are available, it behaves exactly like @ref
+ *  glfwPollEvents, i.e. the events in the queue are processed and the function
+ *  then returns immediately.  Processing events will cause the window and input
+ *  callbacks associated with those events to be called.
+ *
+ *  The timeout value must be a positive finite number.
+ *
+ *  Since not all events are associated with callbacks, this function may return
+ *  without a callback having been called even if you are monitoring all
+ *  callbacks.
+ *
+ *  On some platforms, a window move, resize or menu operation will cause event
+ *  processing to block.  This is due to how event processing is designed on
+ *  those platforms.  You can use the
+ *  [window refresh callback](@ref window_refresh) to redraw the contents of
+ *  your window when necessary during such operations.
+ *
+ *  On some platforms, certain callbacks may be called outside of a call to one
+ *  of the event processing functions.
+ *
+ *  If no windows exist, this function returns immediately.  For synchronization
+ *  of threads in applications that do not create windows, use your threading
+ *  library of choice.
+ *
+ *  Event processing is not required for joystick input to work.
+ *
+ *  @param[in] timeout The maximum amount of time, in seconds, to wait.
+ *
+ *  @reentrancy This function must not be called from a callback.
+ *
+ *  @thread_safety This function must only be called from the main thread.
+ *
+ *  @sa @ref events
+ *  @sa glfwPollEvents
+ *  @sa glfwWaitEvents
+ *
+ *  @since Added in version 3.2.
+ *
+ *  @ingroup window
+ */
+GLFWAPI void glfwWaitEventsTimeout(double timeout);
 
 /*! @brief Posts an empty event to the event queue.
  *
@@ -3494,8 +3582,8 @@ GLFWAPI const char* glfwGetClipboardString(GLFWwindow* window);
  *
  *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED.
  *
- *  @thread_safety This function may be called from any thread.  Access is not
- *  synchronized.
+ *  @thread_safety This function may be called from any thread.  Reading of the
+ *  internal timer offset is not atomic.
  *
  *  @sa @ref time
  *
@@ -3520,7 +3608,8 @@ GLFWAPI double glfwGetTime(void);
  *  floor((2<sup>64</sup> - 1) / 10<sup>9</sup>) and is due to implementations
  *  storing nanoseconds in 64 bits.  The limit may be increased in the future.
  *
- *  @thread_safety This function must only be called from the main thread.
+ *  @thread_safety This function may be called from any thread.  Writing of the
+ *  internal timer offset is not atomic.
  *
  *  @sa @ref time
  *
@@ -3529,6 +3618,48 @@ GLFWAPI double glfwGetTime(void);
  *  @ingroup input
  */
 GLFWAPI void glfwSetTime(double time);
+
+/*! @brief Returns the current value of the raw timer.
+ *
+ *  This function returns the current value of the raw timer, measured in
+ *  1&nbsp;/&nbsp;frequency seconds.  To get the frequency, call @ref
+ *  glfwGetTimerFrequency.
+ *
+ *  @return The value of the timer, or zero if an 
+ *  [error](@ref error_handling) occurred.
+ *
+ *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED.
+ *
+ *  @thread_safety This function may be called from any thread.
+ *
+ *  @sa @ref time
+ *  @sa glfwGetTimerFrequency
+ *
+ *  @since Added in version 3.2.
+ *
+ *  @ingroup input
+ */
+GLFWAPI GLFWuint64 glfwGetTimerValue(void);
+
+/*! @brief Returns the frequency, in Hz, of the raw timer.
+ *
+ *  This function returns the frequency, in Hz, of the raw timer.
+ *
+ *  @return The frequency of the timer, in Hz, or zero if an
+ *  [error](@ref error_handling) occurred.
+ *
+ *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED.
+ *
+ *  @thread_safety This function may be called from any thread.
+ *
+ *  @sa @ref time
+ *  @sa glfwGetTimerValue
+ *
+ *  @since Added in version 3.2.
+ *
+ *  @ingroup input
+ */
+GLFWAPI GLFWuint64 glfwGetTimerFrequency(void);
 
 /*! @brief Makes the context of the specified window current for the calling
  *  thread.
@@ -3928,7 +4059,7 @@ GLFWAPI int glfwGetPhysicalDevicePresentationSupport(VkInstance instance, VkPhys
  *  @remarks If an error occurs before the creation call is made, GLFW returns
  *  the Vulkan error code most appropriate for the error.  Appropriate use of
  *  @ref glfwVulkanSupported and @ref glfwGetRequiredInstanceExtensions should
- *  elminiate almost all occurences of these errors.
+ *  eliminate almost all occurrences of these errors.
  *
  *  @thread_safety This function may be called from any thread.  For
  *  synchronization details of Vulkan objects, see the Vulkan specification.

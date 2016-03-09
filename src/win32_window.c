@@ -1036,19 +1036,18 @@ void _glfwPlatformMaximizeWindow(_GLFWwindow* window)
 void _glfwPlatformShowWindow(_GLFWwindow* window)
 {
     ShowWindow(window->win32.handle, SW_SHOW);
-    BringWindowToTop(window->win32.handle);
-    SetForegroundWindow(window->win32.handle);
-    SetFocus(window->win32.handle);
-}
-
-void _glfwPlatformUnhideWindow(_GLFWwindow* window)
-{
-    ShowWindow(window->win32.handle, SW_SHOW);
 }
 
 void _glfwPlatformHideWindow(_GLFWwindow* window)
 {
     ShowWindow(window->win32.handle, SW_HIDE);
+}
+
+void _glfwPlatformFocusWindow(_GLFWwindow* window)
+{
+    BringWindowToTop(window->win32.handle);
+    SetForegroundWindow(window->win32.handle);
+    SetFocus(window->win32.handle);
 }
 
 int _glfwPlatformWindowFocused(_GLFWwindow* window)
@@ -1139,6 +1138,13 @@ void _glfwPlatformPollEvents(void)
 void _glfwPlatformWaitEvents(void)
 {
     WaitMessage();
+
+    _glfwPlatformPollEvents();
+}
+
+void _glfwPlatformWaitEventsTimeout(double timeout)
+{
+    MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD) (timeout * 1e3), QS_ALLEVENTS);
 
     _glfwPlatformPollEvents();
 }
@@ -1313,6 +1319,7 @@ void _glfwPlatformDestroyCursor(_GLFWcursor* cursor)
 
 void _glfwPlatformSetCursor(_GLFWwindow* window, _GLFWcursor* cursor)
 {
+    RECT area;
     POINT pos;
 
     if (_glfw.cursorWindow != window)
@@ -1325,6 +1332,13 @@ void _glfwPlatformSetCursor(_GLFWwindow* window, _GLFWcursor* cursor)
         return;
 
     if (WindowFromPoint(pos) != window->win32.handle)
+        return;
+
+    GetClientRect(window->win32.handle, &area);
+    ClientToScreen(window->win32.handle, (POINT*) &area.left);
+    ClientToScreen(window->win32.handle, (POINT*) &area.right);
+
+    if (!PtInRect(&area, pos))
         return;
 
     if (cursor)
