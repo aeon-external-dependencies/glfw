@@ -9,7 +9,15 @@ GLFW is a free, Open Source, multi-platform library for OpenGL, OpenGL ES and
 Vulkan application development.  It provides a simple, platform-independent API
 for creating windows, contexts and surfaces, reading input, handling events, etc.
 
-Version 3.2 is _not yet described_.
+Version 3.2 adds support for Vulkan surface creation, window mode switching,
+window maximization, window input focus control, window size and aspect ratio
+limits, human-readable key names, window icons, joystick connection events,
+XInput and DirectInput joystick input, event waiting with timeout, 64-bit
+integer raw timer, context-less window creation, error-less contexts via
+`GL_KHR_no_error` (where available), run-time context creation API selection,
+Windows 8.1 per-monitor DPI and the CMake config-file package system, adds
+simpler build-time configuration, improved documentation and fixes for a large
+number of bugs that together affect all supported platforms.
 
 If you are new to GLFW, you may find the
 [tutorial](http://www.glfw.org/docs/latest/quick.html) for GLFW
@@ -77,6 +85,8 @@ does not find Doxygen, the documentation will not be generated.
  - Added `glfwVulkanSupported`, `glfwGetRequiredInstanceExtensions`,
    `glfwGetInstanceProcAddress`, `glfwGetPhysicalDevicePresentationSupport` and
    `glfwCreateWindowSurface` for platform independent Vulkan support
+ - Added `glfwSetWindowMonitor` for switching between windowed and full screen
+   modes and updating the monitor and desired video mode of full screen windows
  - Added `glfwMaximizeWindow` and `GLFW_MAXIMIZED` for window maximization
  - Added `glfwFocusWindow` for giving windows input focus
  - Added `glfwSetWindowSizeLimits` and `glfwSetWindowAspectRatio` for setting
@@ -84,19 +94,23 @@ does not find Doxygen, the documentation will not be generated.
  - Added `glfwGetKeyName` for querying the layout-specific name of printable
    keys
  - Added `glfwWaitEventsTimeout` for waiting for events for a set amount of time
+ - Added `glfwSetWindowIcon` for setting the icon of a window
  - Added `glfwGetTimerValue` and `glfwGetTimerFrequency` for raw timer access
- - Added `GLFWuint64` for platform-independent 64-bit unsigned values
+ - Added `glfwSetJoystickCallback` and `GLFWjoystickfun` for joystick connection
+   and disconnection events
  - Added `GLFW_NO_API` for creating window without contexts
- - Added `GLFW_CONTEXT_NO_ERROR` context hint for `GL_KHR_no_error` support
  - Added `GLFW_INCLUDE_VULKAN` for including the Vulkan header
+ - Added `GLFW_CONTEXT_CREATION_API`, `GLFW_NATIVE_CONTEXT_API` and
+   `GLFW_EGL_CONTEXT_API` for run-time context creation API selection
+ - Added `GLFW_CONTEXT_NO_ERROR` context hint for `GL_KHR_no_error` support
  - Added `GLFW_TRUE` and `GLFW_FALSE` as client API independent boolean values
- - Added `glfwGetGLXWindow` to query the `GLXWindow` of a window
  - Added icons to examples on Windows and OS X
  - Relaxed rules for native access header macros
  - Removed dependency on external OpenGL or OpenGL ES headers
- - Removed `_GLFW_USE_OPENGL`, `_GLFW_USE_GLESV1` and `_GLFW_USE_GLESV2`
-   configuration macros
+ - Removed `_GLFW_USE_OPENGL`, `_GLFW_USE_GLESV1`, `_GLFW_USE_GLESV2`,
+   `_GLFW_WGL`, `_GLFW_NSGL`, `_GLFW_GLX` and `_GLFW_EGL` configuration macros
  - [Win32] Added support for Windows 8.1 per-monitor DPI
+ - [Win32] Replaced winmm with XInput and DirectInput for joystick input
  - [Win32] Bugfix: Window creation would segfault if video mode setting required
                    the system to be restarted
  - [Win32] Bugfix: MinGW import library lacked the `lib` prefix
@@ -105,18 +119,26 @@ does not find Doxygen, the documentation will not be generated.
  - [Win32] Bugfix: Activating or deactivating displays in software did not
                    trigger monitor callback
  - [Win32] Bugfix: No monitors were listed on headless and VMware guest systems
+ - [Win32] Bugfix: Pressing Ctrl+Pause would report `GLFW_KEY_UNKNOWN`
+ - [Win32] Bugfix: Window size events would be reported in wrong order when
+                   restoring a full screen window
+ - [Cocoa] Made joystick polling more efficient
  - [Cocoa] Removed support for OS X 10.6
  - [Cocoa] Bugfix: Full screen windows on secondary monitors were mispositioned
  - [Cocoa] Bugfix: Connecting a joystick that reports no name would segfault
  - [Cocoa] Bugfix: Modifier flags cache was not updated when window became key
  - [Cocoa] Bugfix: Dead key character composition did not work
+ - [Cocoa] Bugfix: The CGL context was not released until the autorelease pool
+                   was drained by another function
  - [X11] Bugfix: Monitor connection and disconnection events were not reported
  - [X11] Bugfix: Decoding of UTF-8 text from XIM could continue past the end
  - [X11] Bugfix: An XKB structure was leaked during `glfwInit`
  - [X11] Bugfix: XInput2 `XI_Motion` events interfered with the Steam overlay
  - [POSIX] Bugfix: An unrelated TLS key could be deleted by `glfwTerminate`
+ - [Linux] Made joystick polling more efficient
  - [WGL] Changed extension loading to only be performed once
  - [WGL] Removed dependency on external WGL headers
+ - [GLX] Added `glfwGetGLXWindow` to query the `GLXWindow` of a window
  - [GLX] Replaced legacy drawable with `GLXWindow`
  - [GLX] Removed dependency on external GLX headers
  - [GLX] Bugfix: NetBSD does not provide `libGL.so.1`
@@ -134,7 +156,7 @@ can find the latest version of GLFW, as well as news, documentation and other
 information about the project.
 
 If you have questions related to the use of GLFW, we have a
-[support forum](https://sourceforge.net/p/glfw/discussion/247562/), and the IRC
+[support forum](http://discourse.glfw.org/), and the IRC
 channel `#glfw` on [Freenode](http://freenode.net/).
 
 If you have a bug to report, a patch to submit or a feature you'd like to
@@ -185,6 +207,7 @@ skills.
  - heromyth
  - Lucas Hinderberger
  - Paul Holden
+ - IntellectualKitty
  - Aaron Jacobs
  - Toni Jovanoski
  - Arseny Kapoulkine
@@ -221,6 +244,7 @@ skills.
  - Peoro
  - Braden Pellett
  - Arturo J. Pérez
+ - Orson Peters
  - Emmanuel Gil Peyrot
  - Cyril Pichard
  - Pieroman
@@ -246,6 +270,7 @@ skills.
  - TTK-Bandit
  - Sergey Tikhomirov
  - A. Tombs
+ - Ioannis Tsakpinis
  - Samuli Tuomola
  - urraka
  - Jari Vetoniemi
