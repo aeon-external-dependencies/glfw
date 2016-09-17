@@ -2,6 +2,15 @@
 
 @page news New features
 
+@section news_33 New features in 3.3
+
+
+@subsection news_33_keyscancode Platform-specific key scancode query
+
+GLFW now supports querying the platform dependent scancode of any key with
+@ref glfwGetKeyScancode.
+
+
 @section news_32 New features in 3.2
 
 
@@ -158,13 +167,6 @@ creation, with the [GLFW_FOCUSED](@ref window_hints_wnd) window hint.
 
 GLFW now queries the window input focus, visibility and iconification attributes
 and the cursor position directly instead of returning cached data.
-
-
-@subsection news_31_libovr Better interoperability with Oculus Rift
-
-GLFW now provides native access functions for the OS level handles corresponding
-to monitor objects, as well as the @ref rift_guide.  It is also regularly
-tested for compatibility with the latest version of LibOVR (0.4.4 on release).
 
 
 @subsection news_31_charmods Character with modifiers callback
@@ -352,7 +354,7 @@ well as moving a window to a specific position before showing it.
 
 @subsection news_30_undecorated Undecorated windows
 
-Windowed mode windows can now be created without decorations, i.e. things like
+Windowed mode windows can now be created without decorations, e.g. things like
 a frame, a title bar, with the `GLFW_DECORATED` window hint.  This allows for
 the creation of things like splash screens.
 

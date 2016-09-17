@@ -1,8 +1,8 @@
 //========================================================================
-// GLFW 3.2 - www.glfw.org
+// GLFW 3.3 - www.glfw.org
 //------------------------------------------------------------------------
 // Copyright (c) 2002-2006 Marcus Geelnard
-// Copyright (c) 2006-2010 Camilla Berglund <elmindreda@elmindreda.org>
+// Copyright (c) 2006-2016 Camilla Berglund <elmindreda@glfw.org>
 // Copyright (c) 2012 Torsten Walluhn <tw@mad-cad.net>
 //
 // This software is provided 'as-is', without any express or implied
@@ -151,7 +151,8 @@ GLFWAPI GLFWwindow* glfwCreateWindow(int width, int height,
 
     if (ctxconfig.share)
     {
-        if (ctxconfig.share->context.client == GLFW_NO_API)
+        if (ctxconfig.client == GLFW_NO_API ||
+            ctxconfig.share->context.client == GLFW_NO_API)
         {
             _glfwInputError(GLFW_NO_WINDOW_CONTEXT, NULL);
             return NULL;
@@ -627,7 +628,13 @@ GLFWAPI void glfwRestoreWindow(GLFWwindow* handle)
 GLFWAPI void glfwMaximizeWindow(GLFWwindow* handle)
 {
     _GLFWwindow* window = (_GLFWwindow*) handle;
+    assert(window != NULL);
+
     _GLFW_REQUIRE_INIT();
+
+    if (window->monitor)
+        return;
+
     _glfwPlatformMaximizeWindow(window);
 }
 
