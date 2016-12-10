@@ -64,10 +64,6 @@ set_target_properties(glfw PROPERTIES
                       POSITION_INDEPENDENT_CODE ON
                       FOLDER "External/GLFW3")
 
-target_include_directories(glfw
-    PUBLIC ${GLFW_SOURCE_DIR}/include
-)
-
 target_compile_definitions(glfw PRIVATE -D_GLFW_USE_CONFIG_H)
 target_include_directories(glfw PUBLIC
                            $<BUILD_INTERFACE:${GLFW_SOURCE_DIR}/include>
