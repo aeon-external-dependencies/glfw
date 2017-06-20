@@ -1,6 +1,6 @@
 //========================================================================
 // Multisample anti-aliasing test
-// Copyright (c) Camilla Berglund <elmindreda@glfw.org>
+// Copyright (c) Camilla Löwy <elmindreda@glfw.org>
 //
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
@@ -44,10 +44,7 @@
 
 #include "getopt.h"
 
-static const struct
-{
-    float x, y;
-} vertices[4] =
+static const vec2 vertices[4] =
 {
     { -0.6f, -0.6f },
     {  0.6f, -0.6f },
@@ -56,6 +53,7 @@ static const struct
 };
 
 static const char* vertex_shader_text =
+"#version 110\n"
 "uniform mat4 MVP;\n"
 "attribute vec2 vPos;\n"
 "void main()\n"
@@ -64,6 +62,7 @@ static const char* vertex_shader_text =
 "}\n";
 
 static const char* fragment_shader_text =
+"#version 110\n"
 "void main()\n"
 "{\n"
 "    gl_FragColor = vec4(1.0);\n"
@@ -100,7 +99,7 @@ int main(int argc, char** argv)
     int ch, samples = 4;
     GLFWwindow* window;
     GLuint vertex_buffer, vertex_shader, fragment_shader, program;
-    GLint mvp_location, vpos_location, vcol_location;
+    GLint mvp_location, vpos_location;
 
     while ((ch = getopt(argc, argv, "hs:")) != -1)
     {
