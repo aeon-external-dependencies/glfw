@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.0)
 
 project(GLFW C)
 
+if (MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4152 /wd4204 /wd4244")
+endif ()
+
 set(CMAKE_LEGACY_CYGWIN_WIN32 OFF)
 
 if (NOT CMAKE_VERSION VERSION_LESS "3.1")
